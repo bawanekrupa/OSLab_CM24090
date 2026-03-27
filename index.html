@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proto & The Dining Philosophers</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #FFF8F0;
+    --brown: #8B5E3C;
+    --peach: #FFB380;
+    --soft-orange: #FF8C42;
+    --yellow: #FFE066;
+    --green: #7BC67E;
+    --red: #FF6B6B;
+    --blue: #74B9FF;
+    --purple: #A29BFE;
+    --text: #3D2B1F;
+    --glass: rgba(255,255,255,0.45);
+    --shadow: 0 8px 32px rgba(139,94,60,0.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: linear-gradient(135deg, #FFF8F0 0%, #FFE8D6 50%, #FFF0E6 100%);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  h1, h2, h3, .title-font { font-family: 'Fredoka One', cursive; }
+
+  /* Animations */
+  @keyframes float {
+    0%,100%{transform:translateY(0px)} 50%{transform:translateY(-12px)}
+  }
+  @keyframes breathe {
+    0%,100%{transform:scale(1)} 50%{transform:scale(1.04)}
+  }
+  @keyframes blink {
+    0%,90%,100%{transform:scaleY(1)} 95%{transform:scaleY(0.05)}
+  }
+  @keyframes bounce {
+    0%,100%{transform:translateY(0)} 30%{transform:translateY(-18px)} 60%{transform:translateY(-6px)}
+  }
+  @keyframes spin {
+    from{transform:rotate(0deg)} to{transform:rotate(360deg)}
+  }
+  @keyframes fadeIn {
+    from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)}
+  }
+  @keyframes slideIn {
+    from{opacity:0;transform:translateX(-30px)} to{opacity:1;transform:translateX(0)}
+  }
+  @keyframes pulse {
+    0%,100%{opacity:1} 50%{opacity:0.5}
+  }
+  @keyframes glowPulse {
+    0%,100%{box-shadow:0 0 8px rgba(255,180,80,0.4)} 50%{box-shadow:0 0 22px rgba(255,180,80,0.8)}
+  }
+  @keyframes typing {
+    from{width:0} to{width:100%}
+  }
+  @keyframes blush {
+    0%,100%{opacity:0} 50%{opacity:0.7}
+  }
+  @keyframes shake {
+    0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)}
+  }
+  @keyframes particleFloat {
+    0%{transform:translateY(0) rotate(0deg);opacity:0.7}
+    100%{transform:translateY(-100vh) rotate(360deg);opacity:0}
+  }
+  @keyframes starPop {
+    0%{transform:scale(0) rotate(-30deg);opacity:0}
+    60%{transform:scale(1.3) rotate(10deg);opacity:1}
+    100%{transform:scale(1) rotate(0deg);opacity:1}
+  }
+
+  .animate-float { animation: float 3s ease-in-out infinite; }
+  .animate-breathe { animation: breathe 2.5s ease-in-out infinite; }
+  .animate-bounce-once { animation: bounce 0.6s ease; }
+  .animate-fade-in { animation: fadeIn 0.6s ease forwards; }
+  .animate-slide-in { animation: slideIn 0.5s ease forwards; }
+  .animate-pulse { animation: pulse 1.5s ease-in-out infinite; }
+  .animate-shake { animation: shake 0.5s ease; }
+
+  /* Glass panel */
+  .glass {
+    background: var(--glass);
+    backdrop-filter: blur(12px);
+    border: 1.5px solid rgba(255,255,255,0.6);
+    border-radius: 24px;
+    box-shadow: var(--shadow);
+  }
+
+  /* Buttons */
+  .btn {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.1rem;
+    padding: 12px 28px;
+    border-radius: 50px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    letter-spacing: 0.5px;
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(139,94,60,0.25); }
+  .btn:active { transform: translateY(0); }
+  .btn-primary { background: var(--brown); color: white; }
+  .btn-accent { background: var(--soft-orange); color: white; }
+  .btn-ghost { background: rgba(139,94,60,0.1); color: var(--brown); border: 2px solid var(--brown); }
+  .btn-sm { padding: 8px 18px; font-size: 0.9rem; }
+  .btn-green { background: var(--green); color: white; }
+  .btn-red { background: var(--red); color: white; }
+  .btn-blue { background: var(--blue); color: #1a1a2e; }
+  .btn-purple { background: var(--purple); color: white; }
+
+  /* Navigation */
+  .nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    padding: 14px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255,248,240,0.85);
+    backdrop-filter: blur(10px);
+    border-bottom: 1.5px solid rgba(139,94,60,0.1);
+  }
+  .nav-logo { font-family:'Fredoka One',cursive; font-size:1.4rem; color:var(--brown); }
+  .nav-dots { display:flex; gap:8px; }
+  .nav-dot {
+    width:10px;height:10px;border-radius:50%;
+    background:rgba(139,94,60,0.2);
+    cursor:pointer;transition:all 0.2s;
+  }
+  .nav-dot.active { background:var(--brown); transform:scale(1.3); }
+
+  /* Sections */
+  .section {
+    min-height: 100vh;
+    padding: 90px 24px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  /* Particles */
+  .particle {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    animation: particleFloat linear infinite;
+  }
+
+  /* Dialogue bubble */
+  .dialogue {
+    position: relative;
+    background: white;
+    border-radius: 20px;
+    padding: 16px 22px;
+    border: 2px solid var(--peach);
+    box-shadow: 0 4px 16px rgba(255,140,66,0.15);
+    max-width: 340px;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.5;
+    color: var(--text);
+  }
+  .dialogue::after {
+    content:'';
+    position:absolute;
+    bottom:-16px;left:30px;
+    border:8px solid transparent;
+    border-top-color:var(--peach);
+  }
+  .dialogue::before {
+    content:'';
+    position:absolute;
+    bottom:-12px;left:31px;
+    border:7px solid transparent;
+    border-top-color:white;
+    z-index:1;
+  }
+
+  /* Status badges */
+  .status-badge {
+    display:inline-flex;align-items:center;gap:6px;
+    padding:5px 14px;border-radius:50px;
+    font-size:0.8rem;font-weight:700;
+    letter-spacing:0.5px;text-transform:uppercase;
+  }
+  .status-thinking { background:#E8F4FD; color:#2980B9; }
+  .status-hungry { background:#FEF9E7; color:#D35400; }
+  .status-eating { background:#EAFAF1; color:#1E8449; }
+  .status-waiting { background:#FDEDEC; color:#C0392B; }
+  .status-deadlock { background:#F4ECF7; color:#7D3C98; animation:pulse 1s infinite; }
+
+  /* Log terminal */
+  .log-terminal {
+    background:#1a1a2e;
+    border-radius:16px;
+    padding:16px;
+    font-family:monospace;
+    font-size:0.82rem;
+    color:#a8e6cf;
+    max-height:180px;
+    overflow-y:auto;
+    line-height:1.6;
+  }
+  .log-terminal .log-error { color:#ff6b6b; }
+  .log-terminal .log-warn { color:#ffd93d; }
+  .log-terminal .log-success { color:#6bcb77; }
+  .log-terminal .log-info { color:#74b9ff; }
+
+  /* Fork indicator */
+  .fork-svg { transition: all 0.3s ease; }
+  .fork-taken { filter: drop-shadow(0 0 8px var(--red)); }
+  .fork-free { filter: drop-shadow(0 0 5px var(--green)); }
+
+  /* Chapter progress */
+  .chapter-pill {
+    background: rgba(139,94,60,0.08);
+    border-radius:50px;
+    padding: 6px 18px;
+    font-size:0.85rem;
+    font-weight:700;
+    color:var(--brown);
+    letter-spacing:0.5px;
+    margin-bottom:16px;
+  }
+
+  /* Table */
+  .circular-table {
+    position:relative;
+    width:340px;height:340px;
+  }
+  .table-center {
+    position:absolute;
+    top:50%;left:50%;
+    transform:translate(-50%,-50%);
+    width:140px;height:140px;
+    border-radius:50%;
+    background:linear-gradient(135deg,#D4956A,#C17A4B);
+    box-shadow: 0 4px 20px rgba(139,94,60,0.3), inset 0 2px 8px rgba(255,255,255,0.2);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Fredoka One',cursive;
+    color:white;font-size:0.9rem;text-align:center;line-height:1.3;
+  }
+
+  .scroll-hint {
+    position:absolute;bottom:24px;
+    display:flex;flex-direction:column;align-items:center;gap:6px;
+    color:var(--brown);opacity:0.5;font-size:0.8rem;
+    animation:float 2s ease-in-out infinite;
+  }
+
+  /* Responsive */
+  @media(max-width:600px){
+    .circular-table{width:280px;height:280px;}
+    .table-center{width:110px;height:110px;}
+    .section{padding:80px 16px 30px;}
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ============ POTATO SVG COMPONENT ============
+function Potato({ emotion='happy', outfit='none', size=120, animate=true, onClick }) {
+  const [bouncing, setBouncing] = useState(false);
+  const [eyePos, setEyePos] = useState({x:0,y:0});
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleMove = (e) => {
+      if(!ref.current) return;
+      const rect = ref.current.getBoundingClientRect();
+      const cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;
+      const dx = e.clientX - cx, dy = e.clientY - cy;
+      const dist = Math.sqrt(dx*dx+dy*dy);
+      const maxMove = 3;
+      setEyePos({ x:(dx/dist)*maxMove||0, y:(dy/dist)*maxMove||0 });
+    };
+    window.addEventListener('mousemove', handleMove);
+    return () => window.removeEventListener('mousemove', handleMove);
+  }, []);
+
+  const handleClick = () => {
+    setBouncing(true);
+    setTimeout(()=>setBouncing(false), 600);
+    onClick && onClick();
+  };
+
+  const bodyColor = '#C8955A';
+  const bodyDark = '#A67845';
+  const skinLight = '#E8B98A';
+
+  // Mouth shapes by emotion
+  const mouths = {
+    happy: <path d="M 60 85 Q 80 100 100 85" stroke="#5D3A1A" strokeWidth="2.5" fill="none" strokeLinecap="round"/>,
+    confused: <path d="M 60 90 Q 75 85 90 90 Q 85 95 70 93" stroke="#5D3A1A" strokeWidth="2" fill="none" strokeLinecap="round"/>,
+    stressed: <path d="M 55 95 Q 80 82 105 95" stroke="#5D3A1A" strokeWidth="2.5" fill="none" strokeLinecap="round"/>,
+    relieved: <path d="M 62 87 Q 80 100 98 87" stroke="#5D3A1A" strokeWidth="2.5" fill="none" strokeLinecap="round"/>,
+    eating: <ellipse cx="80" cy="90" rx="14" ry="10" fill="#5D3A1A" opacity="0.8"/>,
+    thinking: <path d="M 65 90 L 95 90" stroke="#5D3A1A" strokeWidth="2.5" strokeLinecap="round"/>,
+    sad: <path d="M 60 98 Q 80 85 100 98" stroke="#5D3A1A" strokeWidth="2.5" fill="none" strokeLinecap="round"/>,
+  };
+
+  const eyeColor = emotion === 'stressed' ? '#CC3333' : '#3D2B1F';
+  const blushOpacity = ['happy','eating','relieved'].includes(emotion) ? 0.5 : 0;
+
+  const bodyAnim = animate ? (emotion==='stressed' ? 'animate-shake' : 'animate-breathe') : '';
+
+  return (
+    <div
+      ref={ref}
+      className={`${bodyAnim} ${bouncing?'animate-bounce-once':''}`}
+      style={{display:'inline-block',cursor:onClick?'pointer':'default',userSelect:'none'}}
+      onClick={handleClick}
+    >
+      <svg width={size} height={size*1.15} viewBox="0 0 160 180" xmlns="http://www.w3.org/2000/svg">
+        {/* Shadow */}
+        <ellipse cx="80" cy="172" rx="42" ry="6" fill="rgba(0,0,0,0.1)"/>
+
+        {/* Body */}
+        <ellipse cx="80" cy="100" rx="58" ry="68" fill={bodyColor}/>
+        <ellipse cx="80" cy="100" rx="58" ry="68" fill="url(#bodyGrad)"/>
+
+        {/* Texture spots */}
+        <circle cx="55" cy="80" r="5" fill={bodyDark} opacity="0.4"/>
+        <circle cx="105" cy="115" r="4" fill={bodyDark} opacity="0.35"/>
+        <circle cx="70" cy="125" r="3.5" fill={bodyDark} opacity="0.3"/>
+        <circle cx="95" cy="70" r="3" fill={bodyDark} opacity="0.3"/>
+
+        {/* Highlight */}
+        <ellipse cx="62" cy="68" rx="14" ry="9" fill="rgba(255,255,255,0.25)" transform="rotate(-20,62,68)"/>
+
+        {/* Blush */}
+        <ellipse cx="46" cy="95" rx="12" ry="8" fill="#FF9999" opacity={blushOpacity} style={{animation:`blush 2s ease-in-out infinite`}}/>
+        <ellipse cx="114" cy="95" rx="12" ry="8" fill="#FF9999" opacity={blushOpacity} style={{animation:`blush 2s ease-in-out infinite`}}/>
+
+        {/* Eyes */}
+        {/* Left eye */}
+        <ellipse cx="58" cy="72" rx="13" ry="15" fill="white"/>
+        <ellipse cx="58" cy="72" rx="10" ry="12" fill="white" stroke="rgba(0,0,0,0.08)" strokeWidth="1"/>
+        <circle cx={58+eyePos.x} cy={72+eyePos.y} r="7" fill={eyeColor}/>
+        <circle cx={59+eyePos.x} cy={69+eyePos.y} r="2.5" fill="white"/>
+        <circle cx={56+eyePos.x} cy={74+eyePos.y} r="1.2" fill="white" opacity="0.7"/>
+        {/* Eyelid blink */}
+        <ellipse cx="58" cy="64" rx="13" ry="13" fill={bodyColor} style={{animation:`blink 4s ease-in-out infinite`,transformOrigin:'58px 72px'}}/>
+
+        {/* Right eye */}
+        <ellipse cx="102" cy="72" rx="13" ry="15" fill="white"/>
+        <circle cx={102+eyePos.x} cy={72+eyePos.y} r="7" fill={eyeColor}/>
+        <circle cx={103+eyePos.x} cy={69+eyePos.y} r="2.5" fill="white"/>
+        <circle cx={100+eyePos.x} cy={74+eyePos.y} r="1.2" fill="white" opacity="0.7"/>
+        <ellipse cx="102" cy="64" rx="13" ry="13" fill={bodyColor} style={{animation:`blink 4s ease-in-out infinite 0.1s`,transformOrigin:'102px 72px'}}/>
+
+        {/* Emotion lines */}
+        {emotion==='confused' && <>
+          <path d="M 95 56 Q 100 52 106 56" stroke="#5D3A1A" strokeWidth="2" fill="none"/>
+        </>}
+        {emotion==='stressed' && <>
+          <path d="M 48 58 L 68 62" stroke="#5D3A1A" strokeWidth="2.5" strokeLinecap="round"/>
+          <path d="M 112 58 L 92 62" stroke="#5D3A1A" strokeWidth="2.5" strokeLinecap="round"/>
+          {[0,1,2].map(i=>(
+            <path key={i} d={`M ${65+i*8} ${45-i*3} L ${68+i*8} ${37-i*3}`} stroke="#CC3333" strokeWidth="2" strokeLinecap="round" opacity="0.7"/>
+          ))}
+        </>}
+        {emotion==='thinking' && <>
+          <circle cx="118" cy="48" r="4" fill="#FFE066" opacity="0.8"/>
+          <circle cx="128" cy="36" r="6" fill="#FFE066" opacity="0.8"/>
+          <circle cx="135" cy="22" r="8" fill="#FFE066" opacity="0.8"/>
+          <text x="131" y="26" fontSize="9" fontWeight="bold" fill="#8B5E3C" textAnchor="middle">?</text>
+        </>}
+
+        {/* Mouth */}
+        {mouths[emotion] || mouths.happy}
+
+        {/* Sprout */}
+        <path d="M 80 32 L 80 15 Q 70 8 60 15" stroke="#7BC67E" strokeWidth="3" fill="none" strokeLinecap="round"/>
+        <ellipse cx="60" cy="14" rx="10" ry="7" fill="#7BC67E" transform="rotate(-20,60,14)"/>
+        <path d="M 80 25 Q 90 18 95 22" stroke="#7BC67E" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+        <ellipse cx="96" cy="20" rx="8" ry="5" fill="#7BC67E" transform="rotate(15,96,20)"/>
+
+        {/* Outfits */}
+        {outfit === 'chef' && <>
+          <rect x="55" y="20" width="50" height="22" rx="4" fill="white" stroke="#ddd" strokeWidth="1"/>
+          <ellipse cx="80" cy="18" rx="30" ry="18" fill="white" stroke="#ddd" strokeWidth="1"/>
+          <ellipse cx="80" cy="20" rx="28" ry="14" fill="white"/>
+          <rect x="70" y="26" width="4" height="14" fill="#ddd" opacity="0.5"/>
+          <rect x="86" y="26" width="4" height="14" fill="#ddd" opacity="0.5"/>
+        </>}
+        {outfit === 'glasses' && <>
+          <circle cx="58" cy="72" r="17" fill="none" stroke="#8B5E3C" strokeWidth="2.5" opacity="0.6"/>
+          <circle cx="102" cy="72" r="17" fill="none" stroke="#8B5E3C" strokeWidth="2.5" opacity="0.6"/>
+          <path d="M 75 72 L 85 72" stroke="#8B5E3C" strokeWidth="2.5" opacity="0.6"/>
+          <path d="M 30 68 L 41 70" stroke="#8B5E3C" strokeWidth="2.5" opacity="0.6"/>
+          <path d="M 119 68 L 130 70" stroke="#8B5E3C" strokeWidth="2.5" opacity="0.6"/>
+        </>}
+        {outfit === 'detective' && <>
+          <path d="M 30 48 L 52 60 L 80 52 L 108 60 L 130 48 L 110 30 L 80 22 L 50 30 Z" fill="#8B5E3C" opacity="0.85"/>
+          <rect x="74" y="22" width="12" height="8" fill="#C17A4B" rx="2"/>
+        </>}
+
+        <defs>
+          <radialGradient id="bodyGrad" cx="40%" cy="30%">
+            <stop offset="0%" stopColor={skinLight} stopOpacity="0.4"/>
+            <stop offset="100%" stopColor={bodyDark} stopOpacity="0.3"/>
+          </radialGradient>
+        </defs>
+      </svg>
+    </div>
+  );
+}
+
+// ============ MINI PHILOSOPHER POTATO ============
+function MiniPotato({ state='thinking', name, size=60 }) {
+  const colors = { thinking:'#74B9FF', hungry:'#FFB380', eating:'#7BC67E', waiting:'#FF6B6B', deadlock:'#A29BFE' };
+  const emotions = { thinking:'thinking', hungry:'confused', eating:'eating', waiting:'stressed', deadlock:'stressed' };
+  return (
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+      <Potato emotion={emotions[state]} size={size} animate={true}/>
+      <div style={{fontSize:'0.7rem',fontWeight:700,color:colors[state]||'#666'}}>{name}</div>
+      <span className="status-badge" style={{background:colors[state]+'22',color:colors[state],fontSize:'0.6rem',padding:'2px 8px'}}>
+        {state}
+      </span>
+    </div>
+  );
+}
+
+// ============ FORK SVG ============
+function ForkIcon({ taken, size=28 }) {
+  return (
+    <svg width={size} height={size*2.5} viewBox="0 0 24 60" className={taken?'fork-taken':'fork-free'} style={{transition:'all 0.3s'}}>
+      <rect x="10" y="8" width="4" height="35" rx="2" fill={taken?'#FF6B6B':'#7BC67E'}/>
+      <rect x="6" y="8" width="2.5" height="15" rx="1" fill={taken?'#FF6B6B':'#7BC67E'}/>
+      <rect x="15.5" y="8" width="2.5" height="15" rx="1" fill={taken?'#FF6B6B':'#7BC67E'}/>
+      <rect x="8" y="22" width="8" height="2" rx="1" fill={taken?'#FF6B6B':'#7BC67E'}/>
+      {taken && <circle cx="12" cy="50" r="4" fill="#FF6B6B" opacity="0.6" style={{animation:'pulse 1s infinite'}}/>}
+    </svg>
+  );
+}
+
+// ============ CIRCULAR TABLE COMPONENT ============
+function PhilosophersTable({ philosophers, forks, onForkClick, showLabels=true }) {
+  const n = philosophers.length;
+  const radius = 130;
+  const forkRadius = 88;
+  const cx = 170, cy = 170;
+
+  const stateColors = {
+    thinking:'#74B9FF', hungry:'#FFB380', eating:'#7BC67E',
+    waiting:'#FF6B6B', deadlock:'#A29BFE'
+  };
+  const stateEmotions = {
+    thinking:'thinking', hungry:'confused', eating:'eating',
+    waiting:'stressed', deadlock:'stressed'
+  };
+
+  return (
+    <div style={{position:'relative',width:340,height:340}}>
+      <svg width="340" height="340" style={{position:'absolute',top:0,left:0}}>
+        {/* Table */}
+        <circle cx={cx} cy={cy} r="95" fill="url(#tableGrad)" stroke="#C17A4B" strokeWidth="3"/>
+        <circle cx={cx} cy={cy} r="85" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1"/>
+
+        {/* Table grain lines */}
+        {[0,1,2,3].map(i=>(
+          <line key={i} x1={cx-80+i*25} y1={cy-70} x2={cx-70+i*25} y2={cy+70}
+            stroke="rgba(255,255,255,0.08)" strokeWidth="1"/>
+        ))}
+
+        {/* Plate connections */}
+        {philosophers.map((_,i)=>{
+          const angle = (i/n)*2*Math.PI - Math.PI/2;
+          const px = cx + radius*Math.cos(angle);
+          const py = cy + radius*Math.sin(angle);
+          return <line key={i} x1={cx} y1={cy} x2={px} y2={py}
+            stroke="rgba(139,94,60,0.1)" strokeWidth="1" strokeDasharray="4,4"/>;
+        })}
+
+        {/* Forks */}
+        {forks.map((fork, i) => {
+          const angle = ((i+0.5)/n)*2*Math.PI - Math.PI/2;
+          const fx = cx + forkRadius*Math.cos(angle);
+          const fy = cy + forkRadius*Math.sin(angle);
+          const takenBy = fork.takenBy !== null;
+          const color = takenBy ? '#FF6B6B' : '#7BC67E';
+          return (
+            <g key={i} onClick={()=>onForkClick&&onForkClick(i)}
+              style={{cursor:onForkClick?'pointer':'default'}}>
+              <circle cx={fx} cy={fy} r="16" fill={color+'22'} stroke={color} strokeWidth="2"
+                style={{filter:`drop-shadow(0 0 ${takenBy?8:4}px ${color})`}}/>
+              <text x={fx} y={fy+1} fontSize="14" textAnchor="middle" dominantBaseline="middle">🍴</text>
+              {showLabels && <text x={fx} y={fy+24} fontSize="9" textAnchor="middle" fill={color} fontWeight="bold">F{i+1}</text>}
+              {takenBy !== null && takenBy !== undefined && (
+                <text x={fx} y={fy-24} fontSize="8" textAnchor="middle" fill="#FF6B6B">P{takenBy+1}</text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* Philosopher positions */}
+        {philosophers.map((p,i)=>{
+          const angle = (i/n)*2*Math.PI - Math.PI/2;
+          const px = cx + radius*Math.cos(angle);
+          const py = cy + radius*Math.sin(angle);
+          const color = stateColors[p.state] || '#aaa';
+          return (
+            <g key={i}>
+              <circle cx={px} cy={py} r="30" fill={color+'33'} stroke={color} strokeWidth="2.5"
+                style={{filter:`drop-shadow(0 0 6px ${color}44)`}}/>
+              <text x={px} y={py-2} fontSize="18" textAnchor="middle" dominantBaseline="middle">🥔</text>
+              <text x={px} y={py+14} fontSize="8" textAnchor="middle" fill={color} fontWeight="bold">{p.name}</text>
+            </g>
+          );
+        })}
+
+        <defs>
+          <radialGradient id="tableGrad" cx="40%" cy="35%">
+            <stop offset="0%" stopColor="#D4956A"/>
+            <stop offset="100%" stopColor="#A0522D"/>
+          </radialGradient>
+        </defs>
+      </svg>
+
+      {/* Center label */}
+      <div style={{
+        position:'absolute',top:'50%',left:'50%',
+        transform:'translate(-50%,-50%)',
+        textAlign:'center',pointerEvents:'none',
+        fontFamily:"'Fredoka One',cursive",
+        color:'rgba(255,255,255,0.85)',
+        fontSize:'0.75rem',lineHeight:1.4,
+        width:80
+      }}>
+        🍝<br/>Dining<br/>Table
+      </div>
+    </div>
+  );
+}
+
+// ============ PARTICLES BACKGROUND ============
+function Particles() {
+  return (
+    <div style={{position:'fixed',inset:0,pointerEvents:'none',overflow:'hidden',zIndex:0}}>
+      {[...Array(12)].map((_,i)=>(
+        <div key={i} className="particle" style={{
+          left:`${Math.random()*100}%`,
+          bottom:'-20px',
+          width:`${6+Math.random()*10}px`,
+          height:`${6+Math.random()*10}px`,
+          background:['#FFE066','#FFB380','#FF8C42','#7BC67E','#74B9FF'][i%5],
+          opacity:0.4+Math.random()*0.3,
+          animationDuration:`${8+Math.random()*12}s`,
+          animationDelay:`${Math.random()*8}s`,
+        }}/>
+      ))}
+    </div>
+  );
+}
+
+// ============ TYPING TEXT ============
+function TypingText({ text, speed=40, onDone }) {
+  const [displayed, setDisplayed] = useState('');
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    setDisplayed('');
+    setDone(false);
+    let i = 0;
+    const iv = setInterval(() => {
+      i++;
+      setDisplayed(text.slice(0,i));
+      if(i>=text.length) { clearInterval(iv); setDone(true); onDone&&onDone(); }
+    }, speed);
+    return ()=>clearInterval(iv);
+  }, [text]);
+  return <span>{displayed}{!done&&<span style={{opacity:0.7,animation:'pulse 0.6s infinite'}}>|</span>}</span>;
+}
+
+// ============ MAIN APP ============
+function App() {
+  const [section, setSection] = useState(0); // 0=landing,1=story,2=concept,3=sim,4=solutions,5=end
+  const [chapter, setChapter] = useState(0);
+  const [simPhilosophers, setSimPhilosophers] = useState([
+    {name:'P1',state:'thinking',leftFork:null,rightFork:null},
+    {name:'P2',state:'thinking',leftFork:null,rightFork:null},
+    {name:'P3',state:'thinking',leftFork:null,rightFork:null},
+    {name:'P4',state:'thinking',leftFork:null,rightFork:null},
+    {name:'P5',state:'thinking',leftFork:null,rightFork:null},
+  ]);
+  const [simForks, setSimForks] = useState([
+    {takenBy:null},{takenBy:null},{takenBy:null},{takenBy:null},{takenBy:null}
+  ]);
+  const [logs, setLogs] = useState([]);
+  const [deadlock, setDeadlock] = useState(false);
+  const [solution, setSolution] = useState(null);
+  const [selectedPhil, setSelectedPhil] = useState(null);
+  const [autoRunning, setAutoRunning] = useState(false);
+  const logRef = useRef(null);
+
+  const addLog = (msg, type='info') => {
+    setLogs(l => [...l.slice(-40), {msg, type, id:Date.now()+Math.random()}]);
+    setTimeout(()=>{ if(logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, 50);
+  };
+
+  const resetSim = useCallback(() => {
+    setSimPhilosophers([
+      {name:'P1',state:'thinking',leftFork:null,rightFork:null},
+      {name:'P2',state:'thinking',leftFork:null,rightFork:null},
+      {name:'P3',state:'thinking',leftFork:null,rightFork:null},
+      {name:'P4',state:'thinking',leftFork:null,rightFork:null},
+      {name:'P5',state:'thinking',leftFork:null,rightFork:null},
+    ]);
+    setSimForks([{takenBy:null},{takenBy:null},{takenBy:null},{takenBy:null},{takenBy:null}]);
+    setLogs([]);
+    setDeadlock(false);
+    setSelectedPhil(null);
+    setAutoRunning(false);
+  }, []);
+
+  const checkDeadlock = (phils, forks) => {
+    // deadlock if all phils hold exactly one fork (left) and waiting for right
+    const allWaiting = phils.every(p => p.state === 'waiting' || p.state === 'eating');
+    const someWaiting = phils.some(p => p.state === 'waiting');
+    const allForksHeld = forks.every(f => f.takenBy !== null);
+    return someWaiting && allForksHeld;
+  };
+
+  const tryPickFork = (philIdx, forkType) => {
+    setSimPhilosophers(prev => {
+      const phils = [...prev.map(p=>({...p}))];
+      const forksCopy = [...simForks.map(f=>({...f}))];
+      const n = phils.length;
+      const p = phils[philIdx];
+      const leftForkIdx = philIdx;
+      const rightForkIdx = (philIdx+1)%n;
+
+      if(forkType === 'left') {
+        if(forksCopy[leftForkIdx].takenBy === null) {
+          forksCopy[leftForkIdx].takenBy = philIdx;
+          p.leftFork = leftForkIdx;
+          p.state = p.rightFork !== null ? 'eating' : 'hungry';
+          addLog(`🥔 ${p.name} picked LEFT fork F${leftForkIdx+1}`, 'success');
+          if(p.state==='eating') { p.state='eating'; addLog(`🍝 ${p.name} is EATING!`, 'success'); }
+        } else {
+          addLog(`⏳ ${p.name} waiting — F${leftForkIdx+1} taken by P${forksCopy[leftForkIdx].takenBy+1}`, 'warn');
+          p.state = 'waiting';
+        }
+      } else {
+        if(forksCopy[rightForkIdx].takenBy === null) {
+          forksCopy[rightForkIdx].takenBy = philIdx;
+          p.rightFork = rightForkIdx;
+          p.state = p.leftFork !== null ? 'eating' : 'hungry';
+          addLog(`🥔 ${p.name} picked RIGHT fork F${rightForkIdx+1}`, 'success');
+          if(p.state==='eating') { addLog(`🍝 ${p.name} is EATING!`, 'success'); }
+        } else {
+          addLog(`⏳ ${p.name} waiting — F${rightForkIdx+1} taken by P${forksCopy[rightForkIdx].takenBy+1}`, 'warn');
+          p.state = 'waiting';
+        }
+      }
+
+      setSimForks(forksCopy);
+      const dl = checkDeadlock(phils, forksCopy);
+      if(dl) {
+        setDeadlock(true);
+        addLog('💀 DEADLOCK DETECTED! All philosophers are stuck!', 'error');
+        phils.forEach(ph => { if(ph.state!=='eating') ph.state='deadlock'; });
+      }
+      return phils;
+    });
+  };
+
+  const putDownForks = (philIdx) => {
+    setSimPhilosophers(prev => {
+      const phils = [...prev.map(p=>({...p}))];
+      const p = phils[philIdx];
+      if(p.state !== 'eating') { addLog(`${p.name} is not eating yet!`,'warn'); return prev; }
+
+      setSimForks(fks => {
+        const f = [...fks.map(x=>({...x}))];
+        if(p.leftFork !== null) { f[p.leftFork].takenBy = null; }
+        if(p.rightFork !== null) { f[p.rightFork].takenBy = null; }
+        addLog(`✅ ${p.name} put down forks and finished eating`, 'info');
+        return f;
+      });
+
+      p.leftFork = null; p.rightFork = null; p.state = 'thinking';
+      setDeadlock(false);
+      return phils;
+    });
+  };
+
+  // Auto-demo: trigger deadlock
+  const demoDeadlock = async () => {
+    resetSim();
+    addLog('🎬 Demonstrating deadlock scenario...', 'info');
+    setAutoRunning(true);
+    // Each philosopher picks their LEFT fork
+    for(let i=0;i<5;i++) {
+      await new Promise(r=>setTimeout(r,600));
+      tryPickFork(i,'left');
+    }
+    await new Promise(r=>setTimeout(r,700));
+    // Now each tries right — deadlock!
+    for(let i=0;i<5;i++) {
+      await new Promise(r=>setTimeout(r,400));
+      tryPickFork(i,'right');
+    }
+    setAutoRunning(false);
+  };
+
+  const applyResourceHierarchy = async () => {
+    resetSim();
+    setSolution('hierarchy');
+    addLog('🔧 Applying Resource Hierarchy solution...','info');
+    addLog('Rule: P4 picks RIGHT fork first (breaks circular wait)','info');
+    await new Promise(r=>setTimeout(r,800));
+    // P0-P3 pick left first, P4 picks right first
+    for(let i=0;i<4;i++) {
+      await new Promise(r=>setTimeout(r,500));
+      tryPickFork(i,'left');
+    }
+    // P4 picks right (lower number = left conceptually)
+    await new Promise(r=>setTimeout(r,500));
+    tryPickFork(4,'right'); // fork 0 - already taken? No, fork 0 is P0's left
+    // Actually pick left then right sequentially
+    for(let i=0;i<4;i++) {
+      await new Promise(r=>setTimeout(r,400));
+      tryPickFork(i,'right');
+    }
+    addLog('✅ No deadlock! Resource hierarchy works.','success');
+  };
+
+  const applyWaiter = async () => {
+    resetSim();
+    setSolution('waiter');
+    addLog('🧑‍🍳 Applying Waiter (Arbitrator) solution...','info');
+    addLog('Rule: Max 4 philosophers at table simultaneously','info');
+    await new Promise(r=>setTimeout(r,800));
+    for(let i=0;i<4;i++) {
+      await new Promise(r=>setTimeout(r,500));
+      tryPickFork(i,'left');
+    }
+    addLog('P5 waits outside — reduces resource contention','warn');
+    for(let i=0;i<4;i++) {
+      await new Promise(r=>setTimeout(r,400));
+      tryPickFork(i,'right');
+    }
+    addLog('✅ P1-P4 eat safely! Waiter algorithm works.','success');
+  };
+
+  const sections = ['Home','Story','Concepts','Simulate','Solutions','Done'];
+
+  const chapters = [
+    {
+      title: "The Philosophers Arrive",
+      subtitle: "Chapter 1: Initialization",
+      emotion: 'happy',
+      outfit: 'none',
+      dialogue: "Hello! I'm Proto 🥔. Imagine 5 potato philosophers sitting at a round table, each wanting to eat some delicious spaghetti...",
+      bg: 'linear-gradient(135deg, #FFF8F0, #FFE8D6)',
+    },
+    {
+      title: "One Fork Each",
+      subtitle: "Chapter 2: Resource Constraint",
+      emotion: 'confused',
+      outfit: 'none',
+      dialogue: "But wait! There are only 5 forks — one between each pair. To eat, each philosopher needs TWO forks. Hmm... that's a problem!",
+      bg: 'linear-gradient(135deg, #FFF8F0, #FFF0CC)',
+    },
+    {
+      title: "Everyone Reaches Out",
+      subtitle: "Chapter 3: Deadlock Forms",
+      emotion: 'stressed',
+      outfit: 'detective',
+      dialogue: "All 5 philosophers grab their LEFT fork at once. Now everyone is holding one fork, waiting for the right one. But nobody can proceed!",
+      bg: 'linear-gradient(135deg, #FFF0F0, #FFE0E0)',
+    },
+    {
+      title: "Why This Happens",
+      subtitle: "Chapter 4: System Analysis",
+      emotion: 'thinking',
+      outfit: 'glasses',
+      dialogue: "This is a deadlock! Four conditions: Mutual Exclusion, Hold & Wait, No Preemption, and Circular Wait. All four are present!",
+      bg: 'linear-gradient(135deg, #F0F4FF, #E8EEFF)',
+    },
+    {
+      title: "Proto Has an Idea!",
+      subtitle: "Chapter 5: Resolution",
+      emotion: 'relieved',
+      outfit: 'chef',
+      dialogue: "What if one philosopher picks their RIGHT fork first? That breaks the circular wait! Or... use a waiter to manage access! Let's simulate it!",
+      bg: 'linear-gradient(135deg, #F0FFF4, #E0FFE8)',
+    },
+  ];
+
+  const concepts = [
+    { icon:'🔒', title:'Mutual Exclusion', color:'#FF6B6B',
+      desc:'A fork can only be held by one philosopher at a time. Shared resources must be exclusive.' },
+    { icon:'🤲', title:'Hold & Wait', color:'#FFB380',
+      desc:'A philosopher holds one fork while waiting for another. Resources are held during wait.' },
+    { icon:'⛔', title:'No Preemption', color:'#A29BFE',
+      desc:'A fork cannot be forcefully taken from a philosopher. Resources are only released voluntarily.' },
+    { icon:'🔄', title:'Circular Wait', color:'#74B9FF',
+      desc:'P1 waits for P2, P2 for P3, ... P5 for P1. A cycle of waiting forms.' },
+  ];
+
+  return (
+    <div style={{position:'relative'}}>
+      <Particles/>
+
+      {/* NAV */}
+      <nav className="nav">
+        <div className="nav-logo">🥔 Proto</div>
+        <div className="nav-dots">
+          {sections.map((s,i)=>(
+            <div key={i} className={`nav-dot ${section===i?'active':''}`}
+              onClick={()=>setSection(i)} title={s}/>
+          ))}
+        </div>
+        <div style={{fontSize:'0.8rem',color:'var(--brown)',fontWeight:700,opacity:0.7}}>
+          {sections[section]}
+        </div>
+      </nav>
+
+      {/* ======= LANDING ======= */}
+      {section===0 && (
+        <section className="section" style={{textAlign:'center',gap:24}}>
+          <div style={{position:'relative',marginBottom:8}} className="animate-float">
+            <Potato emotion="happy" size={160} animate={true}/>
+            <div className="dialogue" style={{position:'absolute',top:-20,right:-120,minWidth:200,fontSize:'0.9rem'}}>
+              <TypingText text="What happens when everyone wants to eat… but no one can?" speed={35}/>
+            </div>
+          </div>
+
+          <div style={{maxWidth:520,margin:'0 auto'}}>
+            <div className="chapter-pill">🎓 Operating Systems · Interactive Learning</div>
+            <h1 style={{fontSize:'clamp(2rem,5vw,3.2rem)',color:'var(--brown)',lineHeight:1.2,marginBottom:16}}>
+              The Dining<br/>Philosophers Problem
+            </h1>
+            <p style={{color:'var(--text)',opacity:0.75,fontSize:'1.05rem',lineHeight:1.7,marginBottom:32}}>
+              A classic synchronization puzzle — brought to life through<br/>
+              <strong>interactive storytelling, simulation & visualization</strong> 🥔
+            </p>
+            <div style={{display:'flex',gap:12,justifyContent:'center',flexWrap:'wrap'}}>
+              <button className="btn btn-primary" onClick={()=>setSection(1)}>📖 Start Story</button>
+              <button className="btn btn-ghost" onClick={()=>setSection(3)}>🎮 Jump to Simulation</button>
+            </div>
+          </div>
+
+          <div style={{display:'flex',gap:16,marginTop:24,flexWrap:'wrap',justifyContent:'center'}}>
+            {['📖 Story Mode','🧠 Core Concepts','🎮 Simulation','💡 Solutions'].map((t,i)=>(
+              <div key={i} className="glass" style={{padding:'10px 18px',fontSize:'0.85rem',fontWeight:700,color:'var(--brown)',cursor:'pointer'}}
+                onClick={()=>setSection(i+1)}>
+                {t}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ======= STORY ======= */}
+      {section===1 && (
+        <section className="section" style={{gap:20,background:chapters[chapter].bg,transition:'background 0.5s'}}>
+          <div className="chapter-pill">{chapters[chapter].subtitle}</div>
+          <h2 style={{fontSize:'clamp(1.6rem,4vw,2.4rem)',color:'var(--brown)',textAlign:'center'}}>
+            {chapters[chapter].title}
+          </h2>
+
+          <div style={{display:'flex',flexWrap:'wrap',gap:32,alignItems:'center',justifyContent:'center',maxWidth:800}}>
+            {/* Potato */}
+            <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:16}}>
+              <div className="animate-float">
+                <Potato emotion={chapters[chapter].emotion} outfit={chapters[chapter].outfit} size={130}/>
+              </div>
+              <div className="dialogue" style={{maxWidth:260}}>
+                <TypingText key={chapter} text={chapters[chapter].dialogue} speed={30}/>
+              </div>
+            </div>
+
+            {/* Chapter visual */}
+            <div>
+              {chapter===0 && (
+                <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8}}>
+                  <PhilosophersTable
+                    philosophers={[
+                      {name:'Aristotle',state:'thinking'},{name:'Plato',state:'thinking'},
+                      {name:'Socrates',state:'thinking'},{name:'Kant',state:'thinking'},
+                      {name:'Hume',state:'thinking'},
+                    ]}
+                    forks={[{takenBy:null},{takenBy:null},{takenBy:null},{takenBy:null},{takenBy:null}]}
+                    showLabels={true}
+                  />
+                  <p style={{fontSize:'0.8rem',color:'var(--brown)',opacity:0.7}}>5 philosophers, round table</p>
+                </div>
+              )}
+              {chapter===1 && (
+                <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8}}>
+                  <PhilosophersTable
+                    philosophers={[
+                      {name:'P1',state:'hungry'},{name:'P2',state:'hungry'},
+                      {name:'P3',state:'hungry'},{name:'P4',state:'hungry'},{name:'P5',state:'hungry'},
+                    ]}
+                    forks={[{takenBy:null},{takenBy:null},{takenBy:null},{takenBy:null},{takenBy:null}]}
+                    showLabels={true}
+                  />
+                  <div className="glass" style={{padding:'12px 20px',textAlign:'center',maxWidth:220}}>
+                    <div style={{fontSize:'1.5rem',marginBottom:4}}>🍴</div>
+                    <div style={{fontWeight:700,color:'var(--brown)',fontSize:'0.85rem'}}>
+                      5 forks for 5 philosophers<br/>
+                      <span style={{color:'var(--red)'}}>But each needs 2 to eat!</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {chapter===2 && (
+                <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8}}>
+                  <PhilosophersTable
+                    philosophers={[
+                      {name:'P1',state:'waiting'},{name:'P2',state:'waiting'},
+                      {name:'P3',state:'waiting'},{name:'P4',state:'waiting'},{name:'P5',state:'waiting'},
+                    ]}
+                    forks={[{takenBy:0},{takenBy:1},{takenBy:2},{takenBy:3},{takenBy:4}]}
+                    showLabels={true}
+                  />
+                  <div style={{background:'#FF6B6B22',border:'2px solid #FF6B6B',borderRadius:12,padding:'8px 16px',fontWeight:700,color:'#CC0000',fontSize:'0.85rem',animation:'pulse 1.5s infinite'}}>
+                    💀 DEADLOCK STATE
+                  </div>
+                </div>
+              )}
+              {chapter===3 && (
+                <div className="glass" style={{padding:24,maxWidth:280}}>
+                  <h3 style={{color:'var(--brown)',marginBottom:16,fontSize:'1.1rem'}}>4 Deadlock Conditions</h3>
+                  {['🔒 Mutual Exclusion','🤲 Hold & Wait','⛔ No Preemption','🔄 Circular Wait'].map((c,i)=>(
+                    <div key={i} className="animate-slide-in" style={{
+                      background:'rgba(139,94,60,0.08)',borderRadius:10,padding:'8px 12px',
+                      marginBottom:8,fontWeight:700,fontSize:'0.85rem',color:'var(--text)',
+                      animationDelay:`${i*0.15}s`
+                    }}>{c}</div>
+                  ))}
+                </div>
+              )}
+              {chapter===4 && (
+                <div style={{display:'flex',flexDirection:'column',gap:12,maxWidth:240}}>
+                  {['Resource Hierarchy','Waiter Algorithm','Limit Philosophers'].map((s,i)=>(
+                    <div key={i} className="glass" style={{padding:'12px 16px',display:'flex',alignItems:'center',gap:10}}>
+                      <span style={{fontSize:'1.3rem'}}>['🏛️','🧑‍🍳','👥'][i]</span>
+                      <div>
+                        <div style={{fontWeight:800,fontSize:'0.85rem',color:'var(--brown)'}}>{s}</div>
+                        <div style={{fontSize:'0.75rem',opacity:0.7}}>Solution {i+1}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Chapter nav */}
+          <div style={{display:'flex',gap:12,alignItems:'center',marginTop:8}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>chapter>0?setChapter(c=>c-1):setSection(0)} disabled={false}>
+              ← {chapter===0?'Home':'Prev'}
+            </button>
+            <div style={{display:'flex',gap:6}}>
+              {chapters.map((_,i)=>(
+                <div key={i} onClick={()=>setChapter(i)} style={{
+                  width:10,height:10,borderRadius:'50%',cursor:'pointer',transition:'all 0.2s',
+                  background:i===chapter?'var(--brown)':'rgba(139,94,60,0.25)',
+                  transform:i===chapter?'scale(1.4)':'scale(1)'
+                }}/>
+              ))}
+            </div>
+            <button className="btn btn-primary btn-sm"
+              onClick={()=>chapter<chapters.length-1?setChapter(c=>c+1):setSection(2)}>
+              {chapter===chapters.length-1?'Concepts →':'Next →'}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* ======= CONCEPTS ======= */}
+      {section===2 && (
+        <section className="section" style={{gap:24}}>
+          <div className="chapter-pill">🧠 Core Concepts</div>
+          <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:8}}>
+            <Potato emotion="thinking" outfit="glasses" size={80} animate={true}/>
+            <div>
+              <h2 style={{fontSize:'clamp(1.6rem,4vw,2.2rem)',color:'var(--brown)'}}>Why Does Deadlock Happen?</h2>
+              <p style={{opacity:0.7,fontSize:'0.95rem'}}>All four conditions must be present simultaneously</p>
+            </div>
+          </div>
+
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:16,maxWidth:900,width:'100%'}}>
+            {concepts.map((c,i)=>(
+              <div key={i} className="glass animate-fade-in" style={{
+                padding:24,borderLeft:`4px solid ${c.color}`,
+                animationDelay:`${i*0.12}s`
+              }}>
+                <div style={{fontSize:'2rem',marginBottom:10}}>{c.icon}</div>
+                <h3 style={{fontSize:'1rem',color:c.color,marginBottom:8,fontFamily:"'Fredoka One',cursive"}}>{c.title}</h3>
+                <p style={{fontSize:'0.85rem',opacity:0.8,lineHeight:1.6}}>{c.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* State diagram */}
+          <div className="glass" style={{padding:28,maxWidth:700,width:'100%',marginTop:8}}>
+            <h3 style={{color:'var(--brown)',marginBottom:16,textAlign:'center'}}>Philosopher State Machine</h3>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:12,flexWrap:'wrap'}}>
+              {[
+                {state:'Thinking',color:'#74B9FF',emoji:'💭'},
+                {state:'Hungry',color:'#FFB380',emoji:'😋'},
+                {state:'Eating',color:'#7BC67E',emoji:'🍝'},
+              ].map((s,i,arr)=>(
+                <React.Fragment key={i}>
+                  <div style={{
+                    background:s.color+'22',border:`2px solid ${s.color}`,
+                    borderRadius:16,padding:'12px 20px',textAlign:'center',minWidth:100
+                  }}>
+                    <div style={{fontSize:'1.5rem'}}>{s.emoji}</div>
+                    <div style={{fontWeight:800,color:s.color,fontSize:'0.85rem'}}>{s.state}</div>
+                  </div>
+                  {i<arr.length-1 && <div style={{fontSize:'1.5rem',color:'var(--brown)',opacity:0.5}}>→</div>}
+                </React.Fragment>
+              ))}
+            </div>
+            <p style={{textAlign:'center',marginTop:12,fontSize:'0.8rem',opacity:0.6}}>
+              Deadlock occurs when all philosophers are stuck between Hungry → Eating
+            </p>
+          </div>
+
+          <div style={{display:'flex',gap:12}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setSection(1)}>← Story</button>
+            <button className="btn btn-primary" onClick={()=>setSection(3)}>🎮 Try Simulation →</button>
+          </div>
+        </section>
+      )}
+
+      {/* ======= SIMULATION ======= */}
+      {section===3 && (
+        <section className="section" style={{gap:20}}>
+          <div className="chapter-pill">🎮 Interactive Simulation</div>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:4}}>
+            <Potato emotion={deadlock?'stressed':'happy'} size={70} animate={true}/>
+            <div>
+              <h2 style={{fontSize:'clamp(1.4rem,3vw,2rem)',color:'var(--brown)'}}>Run the Simulation</h2>
+              <p style={{fontSize:'0.85rem',opacity:0.7}}>Click a philosopher, then pick Left/Right fork</p>
+            </div>
+          </div>
+
+          {deadlock && (
+            <div className="animate-fade-in" style={{
+              background:'#FF6B6B22',border:'2px solid #FF6B6B',
+              borderRadius:16,padding:'12px 24px',
+              fontWeight:800,color:'#CC0000',fontSize:'1rem',textAlign:'center',
+              animation:'pulse 1.5s infinite'
+            }}>
+              💀 DEADLOCK DETECTED! All philosophers are stuck.
+            </div>
+          )}
+
+          <div style={{display:'flex',flexWrap:'wrap',gap:24,justifyContent:'center',alignItems:'flex-start'}}>
+            {/* Table */}
+            <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:12}}>
+              <PhilosophersTable
+                philosophers={simPhilosophers}
+                forks={simForks}
+                showLabels={true}
+              />
+
+              {/* Legend */}
+              <div style={{display:'flex',gap:12,flexWrap:'wrap',justifyContent:'center'}}>
+                {[['#7BC67E','Free Fork'],['#FF6B6B','Taken Fork'],['#74B9FF','Thinking'],['#FFB380','Hungry'],['#7BC67E','Eating']].map(([c,l])=>(
+                  <div key={l} style={{display:'flex',alignItems:'center',gap:4,fontSize:'0.75rem',fontWeight:600}}>
+                    <div style={{width:10,height:10,borderRadius:'50%',background:c}}/>
+                    {l}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Controls */}
+            <div style={{display:'flex',flexDirection:'column',gap:12,minWidth:280,maxWidth:320}}>
+              {/* Philosopher selector */}
+              <div className="glass" style={{padding:16}}>
+                <div style={{fontWeight:800,color:'var(--brown)',marginBottom:10,fontSize:'0.9rem'}}>
+                  Select Philosopher
+                </div>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                  {simPhilosophers.map((p,i)=>(
+                    <button key={i}
+                      className={`btn btn-sm ${selectedPhil===i?'btn-primary':'btn-ghost'}`}
+                      onClick={()=>setSelectedPhil(i)}
+                      style={{opacity:p.state==='deadlock'?0.5:1}}
+                    >
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+                {selectedPhil!==null && (
+                  <div style={{marginTop:12,padding:'10px',background:'rgba(139,94,60,0.08)',borderRadius:10}}>
+                    <div style={{fontWeight:700,fontSize:'0.85rem',marginBottom:6,color:'var(--brown)'}}>
+                      {simPhilosophers[selectedPhil].name} — {simPhilosophers[selectedPhil].state}
+                    </div>
+                    <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                      <button className="btn btn-sm btn-ghost" onClick={()=>tryPickFork(selectedPhil,'left')}
+                        disabled={simPhilosophers[selectedPhil].leftFork!==null||deadlock}>
+                        ← Left Fork
+                      </button>
+                      <button className="btn btn-sm btn-ghost" onClick={()=>tryPickFork(selectedPhil,'right')}
+                        disabled={simPhilosophers[selectedPhil].rightFork!==null||deadlock}>
+                        Right Fork →
+                      </button>
+                      {simPhilosophers[selectedPhil].state==='eating' && (
+                        <button className="btn btn-sm btn-green" onClick={()=>putDownForks(selectedPhil)}>
+                          ✅ Put Down
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Quick actions */}
+              <div className="glass" style={{padding:16}}>
+                <div style={{fontWeight:800,color:'var(--brown)',marginBottom:10,fontSize:'0.9rem'}}>Quick Actions</div>
+                <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                  <button className="btn btn-red btn-sm" onClick={demoDeadlock} disabled={autoRunning}>
+                    💀 Demo Deadlock
+                  </button>
+                  <button className="btn btn-ghost btn-sm" onClick={resetSim}>
+                    🔄 Reset
+                  </button>
+                </div>
+              </div>
+
+              {/* Philosopher status */}
+              <div className="glass" style={{padding:16}}>
+                <div style={{fontWeight:800,color:'var(--brown)',marginBottom:10,fontSize:'0.9rem'}}>Status</div>
+                {simPhilosophers.map((p,i)=>(
+                  <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,fontSize:'0.82rem'}}>
+                    <span style={{fontWeight:700}}>{p.name}</span>
+                    <span className={`status-badge status-${p.state}`}>{p.state}</span>
+                    <span style={{fontSize:'0.75rem',opacity:0.6}}>
+                      {p.leftFork!==null?`L:F${p.leftFork+1}`:'L:—'} {p.rightFork!==null?`R:F${p.rightFork+1}`:'R:—'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Log */}
+              <div>
+                <div style={{fontWeight:800,color:'var(--brown)',marginBottom:6,fontSize:'0.85rem'}}>System Log</div>
+                <div className="log-terminal" ref={logRef}>
+                  {logs.length===0 && <div style={{opacity:0.5}}>Waiting for actions...</div>}
+                  {logs.map(l=>(
+                    <div key={l.id} className={`log-${l.type}`} style={{animation:'fadeIn 0.3s ease'}}>
+                      &gt; {l.msg}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{display:'flex',gap:12}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setSection(2)}>← Concepts</button>
+            <button className="btn btn-primary" onClick={()=>setSection(4)}>💡 See Solutions →</button>
+          </div>
+        </section>
+      )}
+
+      {/* ======= SOLUTIONS ======= */}
+      {section===4 && (
+        <section className="section" style={{gap:20}}>
+          <div className="chapter-pill">💡 Solution Strategies</div>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:4}}>
+            <Potato emotion="relieved" outfit="chef" size={80} animate={true}/>
+            <div>
+              <h2 style={{fontSize:'clamp(1.4rem,3vw,2rem)',color:'var(--brown)'}}>Breaking Deadlock</h2>
+              <p style={{fontSize:'0.85rem',opacity:0.7}}>Each strategy eliminates at least one deadlock condition</p>
+            </div>
+          </div>
+
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:16,maxWidth:860,width:'100%'}}>
+            {[
+              {
+                icon:'🏛️', title:'Resource Hierarchy',
+                color:'#74B9FF', badge:'Eliminates Circular Wait',
+                desc:'Number the forks 1–5. Each philosopher must pick the lower-numbered fork first. This breaks the circular dependency.',
+                fn: applyResourceHierarchy, btnLabel:'Apply →', btnClass:'btn-blue'
+              },
+              {
+                icon:'🧑‍🍳', title:'Waiter (Arbitrator)',
+                color:'#7BC67E', badge:'Limits Resource Use',
+                desc:'A central waiter grants permission to pick up forks. At most 4 philosophers can be at the table at once.',
+                fn: applyWaiter, btnLabel:'Apply →', btnClass:'btn-green'
+              },
+              {
+                icon:'⏱️', title:'Timeout & Backoff',
+                color:'#A29BFE', badge:'Eliminates Hold & Wait',
+                desc:'If a philosopher cannot get both forks within a timeout, they put down the held fork and retry later.',
+                fn: ()=>{resetSim();addLog('Timeout strategy: philosophers release forks after timeout','info');setSolution('timeout');}, btnLabel:'Apply →', btnClass:'btn-purple'
+              },
+            ].map((s,i)=>(
+              <div key={i} className="glass animate-fade-in" style={{padding:24,borderTop:`4px solid ${s.color}`,animationDelay:`${i*0.1}s`}}>
+                <div style={{fontSize:'2.2rem',marginBottom:8}}>{s.icon}</div>
+                <h3 style={{fontFamily:"'Fredoka One',cursive",fontSize:'1.2rem',color:s.color,marginBottom:6}}>{s.title}</h3>
+                <span style={{fontSize:'0.7rem',fontWeight:700,background:s.color+'22',color:s.color,padding:'2px 10px',borderRadius:50,letterSpacing:'0.5px'}}>
+                  {s.badge}
+                </span>
+                <p style={{marginTop:12,fontSize:'0.85rem',lineHeight:1.6,opacity:0.8}}>{s.desc}</p>
+                <button className={`btn ${s.btnClass} btn-sm`} style={{marginTop:16}} onClick={()=>{setSection(3);s.fn();}}>
+                  {s.btnLabel}
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Comparison table */}
+          <div className="glass" style={{padding:24,maxWidth:700,width:'100%',overflowX:'auto'}}>
+            <h3 style={{color:'var(--brown)',marginBottom:14,textAlign:'center'}}>Strategy Comparison</h3>
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.82rem'}}>
+              <thead>
+                <tr style={{background:'rgba(139,94,60,0.1)'}}>
+                  {['Strategy','Breaks','Complexity','Fairness'].map(h=>(
+                    <th key={h} style={{padding:'8px 12px',textAlign:'left',fontWeight:800,color:'var(--brown)'}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ['Resource Hierarchy','Circular Wait','Low','Good'],
+                  ['Waiter Algorithm','Hold & Wait','Medium','Best'],
+                  ['Timeout & Backoff','Hold & Wait','High','Fair'],
+                ].map((row,i)=>(
+                  <tr key={i} style={{borderTop:'1px solid rgba(139,94,60,0.1)'}}>
+                    {row.map((cell,j)=>(
+                      <td key={j} style={{padding:'8px 12px',fontWeight:j===0?700:400}}>{cell}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{display:'flex',gap:12}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setSection(3)}>← Simulate</button>
+            <button className="btn btn-primary" onClick={()=>setSection(5)}>🎉 Conclusion →</button>
+          </div>
+        </section>
+      )}
+
+      {/* ======= ENDING ======= */}
+      {section===5 && (
+        <section className="section" style={{gap:24,textAlign:'center',background:'linear-gradient(135deg,#F0FFF4,#E8FFE0)'}}>
+          <div style={{display:'flex',justifyContent:'center',gap:16,flexWrap:'wrap'}}>
+            {['happy','relieved','eating'].map((e,i)=>(
+              <div key={e} className="animate-float" style={{animationDelay:`${i*0.4}s`}}>
+                <Potato emotion={e} outfit={i===1?'chef':i===2?'none':'none'} size={90}/>
+              </div>
+            ))}
+          </div>
+
+          <div style={{animation:'starPop 0.8s ease forwards',fontSize:'3rem'}}>🎉</div>
+
+          <h2 style={{fontSize:'clamp(1.6rem,4vw,2.4rem)',color:'var(--brown)'}}>
+            All Philosophers Are Eating!
+          </h2>
+
+          <div className="glass" style={{maxWidth:520,padding:'28px 36px'}}>
+            <p style={{fontSize:'1.1rem',lineHeight:1.8,color:'var(--text)',fontWeight:600,fontStyle:'italic'}}>
+              "Deadlock is not just a problem of systems,<br/>
+              but of <span style={{color:'var(--soft-orange)'}}>coordination</span>."
+            </p>
+          </div>
+
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,maxWidth:700,width:'100%'}}>
+            {[
+              {icon:'📖',label:'Storytelling',desc:'5-chapter narrative'},
+              {icon:'🧠',label:'4 Conditions',desc:'Complete theory'},
+              {icon:'🎮',label:'Live Simulation',desc:'Interactive demo'},
+              {icon:'💡',label:'3 Solutions',desc:'Compare strategies'},
+            ].map((t,i)=>(
+              <div key={i} className="glass animate-fade-in" style={{padding:16,animationDelay:`${i*0.1}s`}}>
+                <div style={{fontSize:'1.8rem',marginBottom:6}}>{t.icon}</div>
+                <div style={{fontWeight:800,color:'var(--brown)',fontSize:'0.9rem'}}>{t.label}</div>
+                <div style={{fontSize:'0.75rem',opacity:0.6,marginTop:2}}>{t.desc}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{display:'flex',gap:12,flexWrap:'wrap',justifyContent:'center'}}>
+            <button className="btn btn-primary" onClick={()=>{setSection(0);setChapter(0);}}>🔄 Start Over</button>
+            <button className="btn btn-ghost" onClick={()=>setSection(3)}>🎮 Simulate Again</button>
+          </div>
+
+          <p style={{opacity:0.4,fontSize:'0.8rem',marginTop:8}}>
+            Made with 🥔 and ❤️ · Operating Systems · Interactive Learning
+          </p>
+        </section>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
